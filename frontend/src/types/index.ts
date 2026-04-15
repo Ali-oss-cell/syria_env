@@ -186,3 +186,45 @@ export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
 }
+
+// ─── Access / Subscription ──────────────────────────────
+
+export type AccountScope = "tenant_user" | "platform_admin";
+
+export type TenantRole =
+  | "owner"
+  | "manager"
+  | "accountant"
+  | "cashier"
+  | "warehouse"
+  | "purchasing";
+
+export type FeatureKey =
+  | "crm"
+  | "inventory"
+  | "sales"
+  | "purchases"
+  | "accounting"
+  | "reports"
+  | "pos";
+
+export type LimitKey = "max_users" | "max_warehouses" | "monthly_orders";
+
+export interface FeatureCatalogItem {
+  key: FeatureKey;
+  label: string;
+  monthly_price: number;
+  description: string;
+}
+
+export type FeatureEntitlements = Record<FeatureKey, boolean>;
+export type SubscriptionLimits = Record<LimitKey, number>;
+export type SubscriptionUsage = Record<LimitKey, number>;
+
+export interface TenantSubscription {
+  plan_name: string;
+  entitlements: FeatureEntitlements;
+  limits: SubscriptionLimits;
+  usage: SubscriptionUsage;
+  monthly_total: number;
+}

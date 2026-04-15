@@ -34,7 +34,9 @@ export default function RootLayout({
       dir="rtl"
       className={`${geistSans.variable} ${geistMono.variable} ${notoArabic.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-background font-sans">{children}</body>
+      <body suppressHydrationWarning className="min-h-full bg-background font-sans">
+        {children}
+      </body>
     </html>
   );
 }

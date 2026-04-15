@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FEATURE_CATALOG, BASE_MONTHLY_PRICE, computeMonthlyTotal } from "@/lib/subscriptions";
+import type { FeatureKey } from "@/types";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,8 +17,20 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [selectedFeatures, setSelectedFeatures] = useState<FeatureKey[]>([
+    "crm",
+    "inventory",
+    "sales",
+  ]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const monthlyTotal = computeMonthlyTotal(selectedFeatures);
+
+  const toggleFeature = (feature: FeatureKey) => {
+    setSelectedFeatures((prev) =>
+      prev.includes(feature) ? prev.filter((f) => f !== feature) : [...prev, feature]
+    );
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +45,8 @@ export default function RegisterPage() {
 
     try {
       // TODO: replace with real API call
-      console.log("Register:", { companyName, name, email, password });
+      console.log("Register:", { companyName, name, email, password, selectedFeatures, monthlyTotal });
+      localStorage.setItem("pending_subscription_features", JSON.stringify(selectedFeatures));
       router.push("/login");
     } catch {
       setError("فشل إنشاء الحساب");
@@ -103,6 +118,35 @@ export default function RegisterPage() {
               onChange={(e) => setPasswordConfirm(e.target.value)}
               required
             />
+          </div>
+          <div className="grid gap-3 rounded-md border p-3">
+            <p className="text-sm font-medium">اختر المزايا المطلوبة</p>
+            <div className="grid gap-2">
+              {FEATURE_CATALOG.map((feature) => (
+                <label
+                  key={feature.key}
+                  className="flex items-center justify-between rounded-md border p-2 text-sm"
+                >
+                  <div>
+                    <p className="font-medium">{feature.label}</p>
+                    <p className="text-xs text-muted-foreground">{feature.description}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">${feature.monthly_price}</span>
+                    <input
+                      type="checkbox"
+                      checked={selectedFeatures.includes(feature.key)}
+                      onChange={() => toggleFeature(feature.key)}
+                      className="h-4 w-4"
+                    />
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="rounded-md bg-muted p-2 text-sm">
+              <p>رسوم أساسية: ${BASE_MONTHLY_PRICE}</p>
+              <p className="font-semibold">الإجمالي الشهري: ${monthlyTotal}</p>
+            </div>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "...جاري الإنشاء" : "إنشاء حساب"}

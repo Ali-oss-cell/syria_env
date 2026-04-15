@@ -9,15 +9,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppStore } from "@/store/app";
 import type { LoginCredentials } from "@/types";
+import { MOCK_AUTH_ACCOUNTS, findMockAccount } from "@/lib/mock-auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const setUser = useAppStore((s) => s.setUser);
   const setCompany = useAppStore((s) => s.setCompany);
+  const setAccountScope = useAppStore((s) => s.setAccountScope);
+  const setTenantRole = useAppStore((s) => s.setTenantRole);
+  const setSelectedFeatures = useAppStore((s) => s.setSelectedFeatures);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const fillCredentials = (selectedEmail: string, selectedPassword: string) => {
+    setEmail(selectedEmail);
+    setPassword(selectedPassword);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +37,18 @@ export default function LoginPage() {
       const credentials: LoginCredentials = { email, password };
       console.log("Login attempt:", credentials);
 
+      const mockAccount = findMockAccount(email, password);
+      if (!mockAccount) {
+        setError("الحساب غير موجود ضمن الحسابات التجريبية. استخدم أحد الحسابات المعروضة أدناه.");
+        return;
+      }
+
       // Mock: set dummy user for now
       setUser({
         id: "1",
-        name: "Demo User",
-        email,
-        role: "admin",
+        name: mockAccount.name,
+        email: mockAccount.email,
+        role: mockAccount.accountScope === "platform_admin" ? "platform_admin" : mockAccount.tenantRole,
         company_id: "1",
       });
       setCompany({
@@ -42,9 +56,15 @@ export default function LoginPage() {
         name: "Demo Company",
         default_currency: "SYP",
       });
+      setAccountScope(mockAccount.accountScope);
+      setTenantRole(mockAccount.tenantRole);
+      setSelectedFeatures(mockAccount.features);
       localStorage.setItem("auth_token", "mock_token");
+      localStorage.setItem("mock_account_scope", mockAccount.accountScope);
+      localStorage.setItem("mock_tenant_role", mockAccount.tenantRole);
+      localStorage.setItem("mock_features", JSON.stringify(mockAccount.features));
 
-      router.push("/app/home");
+      router.push(mockAccount.accountScope === "platform_admin" ? "/platform" : "/app/home");
     } catch {
       setError("فشل تسجيل الدخول. تحقق من البيانات.");
     } finally {
@@ -99,6 +119,34 @@ export default function LoginPage() {
             </Link>
           </p>
         </form>
+
+        <div className="mt-6 rounded-md border bg-muted/30 p-3">
+          <p className="mb-2 text-sm font-semibold">حسابات تجريبية (Testing)</p>
+          <div className="space-y-2">
+            {MOCK_AUTH_ACCOUNTS.map((account) => (
+              <div
+                key={account.email}
+                className="flex flex-col gap-2 rounded-md border bg-background p-2 text-xs md:flex-row md:items-center md:justify-between"
+              >
+                <div>
+                  <p className="font-medium">{account.name}</p>
+                  <p className="text-muted-foreground" dir="ltr">
+                    {account.email} / {account.password}
+                  </p>
+                  <p className="text-muted-foreground">{account.description}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fillCredentials(account.email, account.password)}
+                >
+                  تعبئة تلقائية
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

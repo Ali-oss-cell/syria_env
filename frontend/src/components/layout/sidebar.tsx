@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { canAccessFeature } from "@/lib/access";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useSyncQueue } from "@/hooks/use-sync-queue";
 import {
@@ -18,7 +19,6 @@ import {
   PackageCheck,
   BookOpen,
   BarChart3,
-  Settings,
   Building2,
   UserCog,
   User,
@@ -29,6 +29,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useAppStore } from "@/store/app";
+import type { FeatureKey } from "@/types";
 
 interface NavGroup {
   label: string;
@@ -36,6 +37,8 @@ interface NavGroup {
     label: string;
     href: string;
     icon: React.ElementType;
+    feature?: FeatureKey;
+    ownerOnly?: boolean;
   }[];
 }
 
@@ -49,48 +52,48 @@ const navGroups: NavGroup[] = [
   {
     label: "إدارة العلاقات",
     items: [
-      { label: "العملاء", href: "/app/crm/customers", icon: Users },
-      { label: "الموردون", href: "/app/crm/suppliers", icon: Truck },
+      { label: "العملاء", href: "/app/crm/customers", icon: Users, feature: "crm" },
+      { label: "الموردون", href: "/app/crm/suppliers", icon: Truck, feature: "crm" },
     ],
   },
   {
     label: "المخزون",
     items: [
-      { label: "المنتجات", href: "/app/inventory/products", icon: Package },
-      { label: "المستودعات", href: "/app/inventory/warehouses", icon: Warehouse },
-      { label: "الحركات", href: "/app/inventory/movements", icon: ArrowLeftRight },
+      { label: "المنتجات", href: "/app/inventory/products", icon: Package, feature: "inventory" },
+      { label: "المستودعات", href: "/app/inventory/warehouses", icon: Warehouse, feature: "inventory" },
+      { label: "الحركات", href: "/app/inventory/movements", icon: ArrowLeftRight, feature: "inventory" },
     ],
   },
   {
     label: "المبيعات",
     items: [
-      { label: "الطلبات", href: "/app/sales/orders", icon: ShoppingCart },
-      { label: "الفواتير", href: "/app/sales/invoices", icon: FileText },
+      { label: "الطلبات", href: "/app/sales/orders", icon: ShoppingCart, feature: "sales" },
+      { label: "الفواتير", href: "/app/sales/invoices", icon: FileText, feature: "sales" },
     ],
   },
   {
     label: "المشتريات",
     items: [
-      { label: "طلبات الشراء", href: "/app/purchases/orders", icon: ClipboardList },
-      { label: "الاستلام", href: "/app/purchases/receipts", icon: PackageCheck },
+      { label: "طلبات الشراء", href: "/app/purchases/orders", icon: ClipboardList, feature: "purchases" },
+      { label: "الاستلام", href: "/app/purchases/receipts", icon: PackageCheck, feature: "purchases" },
     ],
   },
   {
     label: "المحاسبة",
     items: [
-      { label: "دليل الحسابات", href: "/app/accounting/accounts", icon: BookOpen },
+      { label: "دليل الحسابات", href: "/app/accounting/accounts", icon: BookOpen, feature: "accounting" },
     ],
   },
   {
     label: "التقارير",
     items: [
-      { label: "التقارير", href: "/app/reports", icon: BarChart3 },
+      { label: "التقارير", href: "/app/reports", icon: BarChart3, feature: "reports" },
     ],
   },
   {
     label: "الإعدادات",
     items: [
-      { label: "الشركة", href: "/app/settings/company", icon: Building2 },
+      { label: "الشركة", href: "/app/settings/company", icon: Building2, ownerOnly: true },
       { label: "المستخدمون", href: "/app/settings/users", icon: UserCog },
       { label: "حسابي", href: "/app/settings/me", icon: User },
     ],
@@ -101,10 +104,22 @@ export function Sidebar() {
   const pathname = usePathname();
   const isOnline = useOnlineStatus();
   const { sync, isSyncing, pendingCount } = useSyncQueue();
-  const { user, company } = useAppStore();
+  const { user, company, accountScope, tenantRole, subscription } = useAppStore();
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          (!item.ownerOnly || tenantRole === "owner") &&
+          (!item.feature ||
+          canAccessFeature(accountScope, tenantRole, subscription.entitlements, item.feature)
+          )
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
-    <aside className="sidebar fixed inset-y-0 right-0 z-50 w-64 flex-col border-r bg-sidebar text-sidebar-foreground max-md:hidden">
+    <aside className="sidebar fixed inset-y-0 right-0 z-50 flex w-64 flex-col border-r bg-sidebar text-sidebar-foreground max-md:hidden">
       {/* Company header */}
       <div className="flex h-14 items-center gap-3 border-b border-sidebar-border px-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground font-bold">
@@ -118,7 +133,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-        {navGroups.map((group) => (
+        {visibleNavGroups.map((group) => (
           <div key={group.label}>
             <h3 className="mb-2 px-2 text-xs font-medium text-sidebar-foreground/50">
               {group.label}
@@ -177,19 +192,24 @@ export function Sidebar() {
         </div>
 
         {/* POS link */}
-        <Link
-          href="/pos"
-          className="flex items-center gap-2 rounded-md bg-sidebar-primary px-3 py-2 text-sm text-sidebar-primary-foreground hover:bg-sidebar-primary/90 transition-colors"
-        >
-          <ArrowRight className="h-4 w-4" />
-          نقطة البيع
-        </Link>
+        {canAccessFeature(accountScope, tenantRole, subscription.entitlements, "pos") && (
+          <Link
+            href="/pos"
+            className="flex items-center gap-2 rounded-md bg-sidebar-primary px-3 py-2 text-sm text-sidebar-primary-foreground hover:bg-sidebar-primary/90 transition-colors"
+          >
+            <ArrowRight className="h-4 w-4" />
+            نقطة البيع
+          </Link>
+        )}
 
         {/* Logout */}
         <button
           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
           onClick={() => {
             localStorage.removeItem("auth_token");
+            localStorage.removeItem("mock_account_scope");
+            localStorage.removeItem("mock_tenant_role");
+            localStorage.removeItem("mock_features");
             window.location.href = "/login";
           }}
         >
